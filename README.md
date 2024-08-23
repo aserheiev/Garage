@@ -6,4 +6,10 @@
 
 *2. REST-API-Endpunkte, die für die besagte Steuerung und das Abrufen von Informationen verwendet werden.*
 
-Falls ich jemals darauf zurückkomme, möchte ich eine Art von Caching-Unterstützung einführen.
+Falls ich jemals darauf zurückkomme, möchte ich eine Art von Caching-Unterstützung und/oder Authentifikation als Übung einführen.
+
+## Screenshots
+
+![Main page](https://eels.deals/img/scr1.png)
+
+![Management page](https://eels.deals/img/scr2.png)
