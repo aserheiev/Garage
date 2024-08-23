@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="global.css">
+    <link href="/favicon.ico" rel="icon" type="image/x-icon">
+    <title>GARAGE INFO</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        img {
+            width: 300px;
+            margin-top: 20px;
+        }
+
+        #status {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .status-green {
+            color: green;
+        }
+
+        .status-red {
+            color: red;
+
+            table {
+                margin: 20px auto;
+                border-collapse: collapse;
+            }
+
+            #spotsTable {
+                margin-left: auto;
+                margin-right: auto;
+                width: auto;
+            }
+
+            th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+            }
+
+            th {
+                background-color: #f4f4f4;
+            }
+        }
+    </style>
+</head>
+<body>
+<img src="/garage.jpg" alt="Top Image">
+
+<div id="status">Loading...</div>
+
+<table id="spotsTable">
+    <thead>
+    <tr>
+        <th>Etage</th>
+        <th>Freie Plätze</th>
+    </tr>
+    </thead>
+    <tbody>
+    <!-- data goes here -->
+    </tbody>
+</table>
+
+<!-- butans -->
+<div id="buttons">
+
+    <div class="container">
+        <a href="/parkhaus.html" class="button">PARKHAUS VERWALTUNG</a>
+    </div>
+
+    <div>
+        <label for="instaParkKennzeichen"></label><input type="text" id="instaParkKennzeichen"
+                                                         placeholder="Kennzeichen angeben">
+        <label for="instaParkKennzeichen"></label><input type="text" id="instaParkModell" placeholder="Modell angeben">
+        <select id="instaParkSelector" name="Typ">
+            <option value="AUTO">AUTO</option>
+            <option value="MOTORRAD">MOTORRAD</option>
+        </select>
+        <label for="instaParkKennzeichen"></label><input type="text" id="instaParkKunde"
+                                                         placeholder="Kundennamen angeben">
+
+        <button onclick="instapark()">INSTAPARK</button>
+    </div>
+
+    <div>
+        <table>
+            <tbody>
+            <tr>
+                <th>Auto Parkplatz</th>
+                <th id="instaParkAusgabe"> --</th>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div>
+        <label for="plateSearch"></label><input type="text" id="plateSearch" placeholder="Nummernschild suchen">
+        <button onclick="searchPlates()">Fahrzeug nach Nummernschild suchen</button>
+    </div>
+    <div>
+        <table>
+            <tbody>
+            <tr>
+                <th>Ausgabe</th>
+                <th id="plateAusgabe"> --</th>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div>
+        <input type="text" id="input0" placeholder="Niedrigste Etage">
+        <input type="text" id="input1" placeholder="Etagen">
+        <input type="text" id="input2" placeholder="Plätze">
+        <button onclick="sendPostRequest()">LÖSCHEN UND REINIT DER DATENBANK</button>
+    </div>
+</div>
+
+<script>
+
+    function instapark() {
+        const plates = document.getElementById("instaParkKennzeichen").value;
+        const model = document.getElementById("instaParkModell").value;
+        const kunde = document.getElementById("instaParkKunde").value;
+        const typ = document.getElementById("instaParkSelector").value;
+        const ausgabe = document.getElementById("instaParkAusgabe");
+
+        const car = {
+            nummernschild: plates,
+            fahrzeugTyp: typ,
+            model: model,
+            kunde: kunde
+        }
+
+        fetch(`/instapark`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(car),
+        })
+            .then(response => {
+                if (response.status === 409) {
+                    ausgabe.textContent = "Fehler. Das Fahrzeug mit diesen Schildern ist schon geparkt.";
+                    return null;
+                } else if (!response.ok) {
+                    ausgabe.textContent = "Critical error. This should never happen :)";
+                    return null;
+                } else if (response.status === 403) {
+                    ausgabe.textContent = "Alle Parkplätze sind leider schon besetzt.";
+                    return null;
+                }
+                return response.json();
+            }).then(data => {
+            if (data) {
+                ausgabe.textContent = `Automatisch zugewiesene Parkplatz Nr.: ${data.id}, Etage: ${data.etage}`;
+            }
+        }).catch(error => {
+            console.error('Something went wrong', error);
+        });
+    }
+
+    function updateStatus() {
+        fetch('/freespots')
+            .then(response => response.text())
+            .then(data => {
+                const statusElement = document.getElementById('status');
+                statusElement.textContent = "FREIE PLÄTZE: " + data;
+                if (data.trim() === '0') {
+                    statusElement.classList.remove('status-green');
+                    statusElement.classList.add('status-red');
+                } else {
+                    statusElement.classList.remove('status-red');
+                    statusElement.classList.add('status-green');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching status:', error);
+                const statusElement = document.getElementById('status');
+                statusElement.textContent = 'Error fetching status';
+                statusElement.classList.remove('status-green', 'status-red');
+            });
+    }
+
+    function updateTable() {
+        fetch('/freespotsbyfloor')
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById('spotsTable').getElementsByTagName('tbody')[0];
+                tableBody.innerHTML = ''; // yeet
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const tdFloor = document.createElement('td');
+                    const tdFreeSpots = document.createElement('td');
+                    tdFloor.textContent = row.etage;
+                    tdFreeSpots.textContent = row.spots;
+                    tr.appendChild(tdFloor);
+                    tr.appendChild(tdFreeSpots);
+                    tableBody.appendChild(tr);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching table data:', error);
+            });
+    }
+
+    function sendPostRequest() {
+        const input0 = document.getElementById('input0').value;
+        const input1 = document.getElementById('input1').value;
+        const input2 = document.getElementById('input2').value;
+
+        const url = new URL('/init', window.location.origin);
+        url.searchParams.append('startDepth', input0);
+        url.searchParams.append('floorAmount', input1);
+        url.searchParams.append('parkplatzAmount', input2);
+
+        fetch(url, {
+            method: 'POST'
+        })
+            .then(response => response.text())
+            .then(data => {
+                alert('POST request sent successfully.');
+            })
+            .catch(error => {
+                console.error('Something went wrong');
+            });
+    }
+
+    function searchPlates() {
+        const plate = document.getElementById('plateSearch').value;
+        const ausgabe = document.getElementById('plateAusgabe');
+
+        const url = new URL('/fahrzeugposition', window.location.origin);
+        url.searchParams.append('nummernschild', plate);
+
+        fetch(url, {
+            method: 'GET'
+        })
+            .then(response => {
+                if (response.status === 404) {
+                    ausgabe.textContent = "FAHRZEUG NICHT GEFUNDEN";
+                    return null;
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data) {
+                    ausgabe.textContent = `Parkplatz Nr.: ${data.id}, Etage: ${data.etage}`;
+                }
+            })
+            .catch(error => {
+                console.error('Something went wrong', error);
+            });
+    }
+
+    updateStatus();
+    updateTable();
+
+    setInterval(updateStatus, 1000);
+    setInterval(updateTable, 1000);
+</script>
+</body>
+</html>

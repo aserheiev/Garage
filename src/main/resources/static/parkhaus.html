@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="global.css">
+    <link href="/favicon.ico" rel="icon" type="image/x-icon">
+    <title>Parkplatz Table</title>
+</head>
+<body>
+
+<div class="container">
+    <a href="http://localhost:8080" class="button">Zurück zur Startseite</a>
+</div>
+
+<h2>PARKPLATZ LISTE</h2>
+<table id="parkplatzTable" style="width:80%; margin-left: auto; margin-right: auto">
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>Etage</th>
+        <th>Ist Besetzt</th>
+        <th>Fahrzeug Nummernschild</th>
+        <th>Fahrzeug Typ</th>
+        <th>Fahrzeug Model</th>
+        <th>Kunde</th>
+        <th>Aktion</th>
+    </tr>
+    </thead>
+    <tbody>
+
+    </tbody>
+</table>
+
+<script>
+    // gigajank. for some reason fetching the data in the fill function works,
+    // but iterating through it produces nothing. so I have to leave it here
+    let plates = [];
+
+    function fetchParkplaetze() {
+        fetch('/parkplaetze').then(response => response.json()).then(data => {
+            const tableBody = document.querySelector('#parkplatzTable tbody');
+            tableBody.innerHTML = '';  // yeet the existing data
+
+            data.forEach(parkplatz => {
+                const row = document.createElement('tr');
+
+                // make cellios
+
+                const idCell = document.createElement('td');
+                idCell.textContent = parkplatz.id;
+                row.appendChild(idCell);
+
+                const etageCell = document.createElement('td');
+                etageCell.textContent = parkplatz.etage;
+                row.appendChild(etageCell);
+
+                const istBesetztCell = document.createElement('td');
+                istBesetztCell.textContent = parkplatz.istBesetzt ? 'Ja' : 'Nein';
+                row.appendChild(istBesetztCell);
+
+                if (parkplatz.nummernschild) {
+                    const nummernschildCell = document.createElement('td');
+                    nummernschildCell.textContent = parkplatz.nummernschild.nummernschild;
+                    plates.push(parkplatz.nummernschild.nummernschild);
+                    row.appendChild(nummernschildCell);
+
+                    const fahrzeugTypCell = document.createElement('td');
+                    fahrzeugTypCell.textContent = parkplatz.nummernschild.fahrzeugTyp;
+                    row.appendChild(fahrzeugTypCell);
+
+                    const modelCell = document.createElement('td');
+                    modelCell.textContent = parkplatz.nummernschild.model;
+                    row.appendChild(modelCell);
+
+                    const kundeCell = document.createElement('td');
+                    kundeCell.textContent = parkplatz.nummernschild.kunde;
+                    row.appendChild(kundeCell);
+                } else {
+                    row.appendChild(document.createElement('td'));
+                    row.appendChild(document.createElement('td'));
+                    row.appendChild(document.createElement('td'));
+                    row.appendChild(document.createElement('td'));
+                }
+
+                const actionsCell = document.createElement('td');
+
+                if (parkplatz.istBesetzt) {
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Verlassen';
+                    deleteButton.onclick = function () {
+                        removeParkplatz(parkplatz.id, parkplatz.etage);
+                    };
+                    actionsCell.appendChild(deleteButton);
+                } else {
+                    const fillButton = document.createElement('button');
+                    fillButton.textContent = 'Parken';
+                    fillButton.onclick = function () {
+                        fillParkplatz(parkplatz.id, parkplatz.etage);
+                    };
+                    actionsCell.appendChild(fillButton);
+                }
+
+                row.appendChild(actionsCell);
+
+                tableBody.appendChild(row);
+            });
+        })
+            .catch(error => console.error('Error fetching data:', error));
+    }
+
+    // clear the spot
+    function removeParkplatz(id, etage) {
+        const parkplatzData = {
+            id: id,
+            etage: etage,
+            istBesetzt: false,
+            nummernschild: null
+        };
+
+        let confirmed = confirm("Wirklich löschen?");
+
+        if (confirmed) {
+            fetch(`/park`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(parkplatzData),
+            })
+                .then(response => {
+                    if (response.ok) {
+                        plates.length = 0; // flush the array before refilling it
+                        fetchParkplaetze();
+                    } else {
+                        alert("Something went seriously wrong.");
+                        console.error('Error updating parkplatz');
+                    }
+                });
+        }
+    }
+
+    function fillParkplatz(id, etage) {
+
+        const auto = "AUTO";
+        const motorrad = "MOTORRAD";
+        let valid = false;
+        let fahrzeugTyp;
+        let nummernschild;
+
+        // jank
+        while (!valid) {
+            valid = true;
+            nummernschild = prompt("Enter the vehicle's license plate:");
+            if (nummernschild == null) {
+                return;
+            }
+
+            plates.forEach(plate => {
+                if (nummernschild === plate) {
+                    valid = false;
+                    alert("The vehicle with this plate is already parked! Enter a different one.");
+                }
+            })
+        }
+
+        valid = false;
+
+        while (!valid) {
+            fahrzeugTyp = prompt("Enter the vehicle type (AUTO or MOTORRAD):");
+
+            if (fahrzeugTyp == null) {
+                return;
+            }
+
+            if (fahrzeugTyp !== auto && fahrzeugTyp !== motorrad) {
+                alert("Ungültiger Typ! Es werden nur „AUTO“ und „MOTORRAD“ unterstützt.");
+            } else {
+                valid = true;
+            }
+        }
+
+        const model = prompt("Enter the vehicle model:");
+        if (model == null) {
+            return;
+        }
+
+        const kunde = prompt("Enter the customer name:");
+        if (kunde == null) {
+            return;
+        }
+
+        const parkplatzData = {
+            id: id,
+            etage: etage,
+            istBesetzt: true,
+            nummernschild: {
+                nummernschild,
+                fahrzeugTyp,
+                model,
+                kunde
+            }
+        };
+
+        fetch(`/park`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(parkplatzData),
+        })
+            .then(response => {
+                if (response.ok) {
+                    fetchParkplaetze();
+                } else {
+                    alert("Something went seriously wrong.");
+                    console.error('Error filling parkplatz');
+                }
+            });
+    }
+
+    fetchParkplaetze();
+</script>
+
+</body>
+</html>
